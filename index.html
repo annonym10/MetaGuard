@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaGuard - Удаление метаданных</title>
+    <link rel="icon" href="MetaGuard.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .file-drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.75rem;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .file-drop-zone:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        
+        .file-drop-zone.dragover {
+            border-color: #10b981;
+            background-color: #d1fae5;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background-color: #f8fafc;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #10b981;
+            transition: width 0.3s;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            z-index: 9999;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .risk-high {
+            background-color: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .risk-medium {
+            background-color: #fef3c7;
+            color: #d97706;
+        }
+        
+        .risk-low {
+            background-color: #d1fae5;
+            color: #059669;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Шапка -->
+        <header class="mb-10">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold text-gray-900">
+                        <span class="text-blue-600">🛡️ Meta</span>Guard
+                    </h1>
+                    <p class="text-gray-600 mt-2">Защитите конфиденциальность - удалите метаданные из файлов</p>
+                </div>
+                <div class="bg-green-50 px-4 py-2 rounded-lg">
+                    <span class="text-green-700 font-medium">✅ Локальная обработка</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Основное содержимое -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Левая колонка: Загрузка файлов и действия -->
+            <div class="lg:col-span-2">
+                <!-- Зона загрузки файлов -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <h2 class="text-2xl font-bold mb-6">📁 Загрузка файлов</h2>
+                    
+                    <div 
+                        id="dropZone" 
+                        class="file-drop-zone"
+                        onclick="selectFiles()"
+                    >
+                        <div class="text-5xl mb-4">📁</div>
+                        <h3 class="text-xl font-semibold mb-2">Перетащите файлы сюда</h3>
+                        <p class="text-gray-600 mb-4">или нажмите для выбора файлов</p>
+                        <p class="text-sm text-gray-500">
+                            Поддерживаются: JPG, PNG, PDF, DOCX (максимум 100 файлов)
+                        </p>
+                    </div>
+                    
+                    <!-- Скрытый input для выбора файлов -->
+                    <input 
+                        type="file" 
+                        id="fileInput" 
+                        multiple 
+                        accept=".jpg,.jpeg,.png,.pdf,.docx,.doc"
+                        class="hidden"
+                        onchange="handleFiles(this.files)"
+                    >
+                    
+                    <!-- Список загруженных файлов -->
+                    <div class="mt-6">
+                        <h3 class="font-semibold mb-3">Загруженные файлы:</h3>
+                        <div id="fileList" class="space-y-3 max-h-80 overflow-y-auto">
+                            <div class="text-center text-gray-500 py-4">
+                                Файлы еще не загружены
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Информация о загрузке -->
+                    <div id="uploadInfo" class="mt-4 text-sm text-gray-600 hidden">
+                        <div class="flex justify-between mb-1">
+                            <span>Загружено:</span>
+                            <span id="fileCount">0 файлов</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Панель действий -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-6">🚀 Действия</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <button 
+                            id="analyzeBtn"
+                            onclick="analyzeFiles()"
+                            class="px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled
+                        >
+                            <span class="mr-2">🔍</span>
+                            Анализировать метаданные
+                        </button>
+                        
+                        <button 
+                            id="cleanBtn"
+                            onclick="cleanFiles()"
+                            class="px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled
+                        >
+                            <span class="mr-2">🧹</span>
+                            Очистить метаданные
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <button 
+                            onclick="selectFiles()"
+                            class="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium"
+                        >
+                            📂 Выбрать файлы
+                        </button>
+                        
+                        <button 
+                            onclick="clearFiles()"
+                            class="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                        >
+                            🗑️ Очистить список
+                        </button>
+                        
+                        <button 
+                            onclick="saveAllCleanedFiles()"
+                            id="saveAllBtn"
+                            class="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium hidden"
+                        >
+                            💾 Сохранить все
+                        </button>
+                        
+                        <button 
+                            onclick="generateReport()"
+                            class="px-4 py-3 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 font-medium"
+                        >
+                            📄 Отчет
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Правая колонка: Настройки и результаты -->
+            <div class="space-y-6">
+                <!-- Настройки очистки -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4">⚙️ Настройки очистки</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Режим очистки:
+                            </label>
+                            <select id="modeSelect" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="social">📱 Для соц. сетей (удалить GPS)</option>
+                                <option value="business">💼 Для деловой переписки</option>
+                                <option value="anonymous">🕶️ Полная анонимность</option>
+                                <option value="custom">🎛️ Ручной режим</option>
+                            </select>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="backupCheck" class="rounded" checked>
+                                <span class="text-sm">Создавать резервные копии</span>
+                            </label>
+                            
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="autoSaveCheck" class="rounded">
+                                <span class="text-sm">Сохранять автоматически</span>
+                            </label>
+                            
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="openFolderCheck" class="rounded" checked>
+                                <span class="text-sm">Открывать папку после сохранения</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Результаты -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4">📊 Результаты</h2>
+                    
+                    <div id="results" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <div class="text-4xl mb-4">📊</div>
+                            <p>Результаты появятся здесь</p>
+                            <p class="text-sm mt-2">После анализа или очистки файлов</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Статистика -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4">📈 Статистика</h2>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-lg">
+                            <div class="text-2xl font-bold text-blue-600" id="totalFiles">0</div>
+                            <div class="text-blue-800 text-sm">Всего файлов</div>
+                        </div>
+                        
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <div class="text-2xl font-bold text-green-600" id="processedFiles">0</div>
+                            <div class="text-green-800 text-sm">Обработано</div>
+                        </div>
+                        
+                        <div class="text-center p-3 bg-purple-50 rounded-lg">
+                            <div class="text-2xl font-bold text-purple-600" id="savedFiles">0</div>
+                            <div class="text-purple-800 text-sm">Сохранено</div>
+                        </div>
+                        
+                        <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                            <div class="text-2xl font-bold text-yellow-600" id="riskScore">0%</div>
+                            <div class="text-yellow-800 text-sm">Общий риск</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Подвал -->
+        <footer class="mt-12 pt-8 border-t text-center text-gray-500 text-sm">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <span class="font-medium">MetaGuard v1.0.0</span> • Локальная обработка • Безопасность данных
+                </div>
+                <div class="space-x-4">
+                    <button onclick="showHelp()" class="text-blue-600 hover:text-blue-800">📖 Справка</button>
+                    <button onclick="showAbout()" class="text-blue-600 hover:text-blue-800">ℹ️ О программе</button>
+                    <button onclick="openDevTools()" class="text-blue-600 hover:text-blue-800">🔧 Консоль</button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // ====================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ======================
+        let uploadedFiles = [];
+        let processedFiles = 0;
+        let savedFiles = 0;
+        let totalRiskScore = 0;
+        
+        // ====================== ИНИЦИАЛИЗАЦИЯ ======================
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDragAndDrop();
+            updateStats();
+        });
+        
+        // ====================== DRAG AND DROP ======================
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+        }
+        
+        // ====================== ВЫБОР ФАЙЛОВ ======================
+        async function selectFiles() {
+            try {
+                // Используем Electron API для выбора файлов
+                const hasSelectApi = !!window.api?.selectFiles;
+                const filePaths = hasSelectApi ? (await window.api.selectFiles() || []) : [];
+                
+                if (filePaths.length > 0) {
+                    // Создаем объекты File из путей
+                    const files = filePaths.map(path => {
+                        // Это упрощенный пример, в реальном приложении нужно получить файлы через dialog
+                        return {
+                            name: path.split(/[\\/]/).pop(),
+                            path: path,
+                            size: 0, // Будет получено при анализе
+                            type: getFileType(path)
+                        };
+                    });
+                    
+                    handleFiles(files);
+                } else if (!hasSelectApi) {
+                    document.getElementById('fileInput').click();
+                }
+            } catch (error) {
+                console.error('Ошибка выбора файлов:', error);
+                // Если нет Electron API, используем обычный input
+                document.getElementById('fileInput').click();
+            }
+        }
+        
+        // ====================== ОБРАБОТКА ФАЙЛОВ ======================
+        function withTimeout(promise, timeoutMs, timeoutMessage) {
+            let timerId;
+            const timeoutPromise = new Promise((_, reject) => {
+                timerId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+            });
+            return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timerId));
+        }
+
+        function handleFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            
+            const maxFiles = 100;
+            if (uploadedFiles.length + fileList.length > maxFiles) {
+                showNotification(`Максимальное количество файлов: ${maxFiles}`, 'warning');
+                return;
+            }
+            
+            // Добавляем файлы в список
+            for (let i = 0; i < fileList.length; i++) {
+                const file = fileList[i];
+                
+                // Получаем имя и путь файла
+                let fileName, filePath;
+                
+                if (file instanceof File) {
+                    // Если это объект File из input
+                    fileName = file.name;
+                    filePath = file.path || '';
+                } else {
+                    // Если это объект из Electron
+                    fileName = file.name;
+                    filePath = file.path;
+                }
+
+                if (!filePath || !/[\\/]/.test(filePath)) {
+                    showNotification(`Не удалось получить путь к "${fileName}". Используйте кнопку "Выбрать файлы".`, 'warning');
+                    continue;
+                }
+                
+                // Проверяем тип файла
+                const allowedTypes = ['.jpg', '.jpeg', '.png', '.pdf', '.docx', '.doc'];
+                const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+                
+                if (!allowedTypes.includes(fileExt)) {
+                    showNotification(`Файл "${fileName}" не поддерживается`, 'warning');
+                    continue;
+                }
+                
+                uploadedFiles.push({
+                    id: Date.now() + i,
+                    name: fileName,
+                    path: filePath,
+                    size: file.size || 0,
+                    type: getFileType(fileName),
+                    status: 'waiting', // waiting, analyzing, cleaning, done, error
+                    metadata: null,
+                    result: null,
+                    cleanedPath: null,
+                    saved: false
+                });
+            }
+            
+            updateFileList();
+            updateButtons();
+            updateStats();
+            showUploadInfo();
+        }
+        
+        // ====================== АНАЛИЗ ФАЙЛОВ ======================
+        async function analyzeFiles() {
+            if (uploadedFiles.length === 0) return;
+            
+            showNotification('Начинаем анализ файлов...', 'info');
+            
+            // Обновляем статусы файлов
+            uploadedFiles.forEach(file => {
+                file.status = 'analyzing';
+            });
+            updateFileList();
+            
+            totalRiskScore = 0;
+            
+            // Анализируем каждый файл
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                
+                try {
+                    // В реальном приложении здесь будет вызов Electron IPC
+                    const result = await withTimeout(
+                        window.api.analyzeFile(file.path),
+                        30000,
+                        `Таймаут анализа файла: ${file.name}`
+                    );
+                    // console.log('Результат от API:', result);
+                    /*const result = {
+                        success: true,
+                        metadata: { test: 'данные' },
+                        riskScore: 65,
+                        riskAssessment: { overallScore: 65, level: 'medium' }
+                    };
+                    console.log('Тестовый результат:', result);*/
+                    // Пока используем имитацию
+                    // const result = await simulateFileAnalysis(file);
+                    
+                    if (result.success) {
+                        file.status = 'done';
+                        file.metadata = result.metadata;
+                        file.riskScore = result.riskScore || result.riskAssessment?.overallScore || 0;
+                        file.warnings = result.riskAssessment?.warnings || [];
+                        totalRiskScore += file.riskScore;
+                        
+                        showNotification(`Проанализирован: ${file.name}`, 'success');
+                    } else {
+                        file.status = 'error';
+                        file.result = { error: result.error };
+                        showNotification(`Ошибка анализа: ${file.name}`, 'error');
+                    }
+                } catch (error) {
+                    file.status = 'error';
+                    file.result = { error: error.message };
+                    console.error('Ошибка анализа:', error);
+                    showNotification(`Ошибка: ${file.name}`, 'error');
+                }
+                
+                updateFileList();
+                updateStats();
+            }
+            
+            // Показываем результаты анализа
+            showAnalysisResults();
+            
+            // Включаем кнопку очистки
+            document.getElementById('cleanBtn').disabled = false;
+            showNotification('Анализ завершен!', 'success');
+        }
+        
+        // Имитация анализа файла
+        async function simulateFileAnalysis(file) {
+            // Имитация задержки
+            await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+            
+            const riskScore = Math.floor(Math.random() * 100);
+            const hasGPS = Math.random() > 0.5;
+            const hasAuthor = Math.random() > 0.3;
+            
+            return {
+                success: true,
+                metadata: {
+                    hasGPS: hasGPS,
+                    author: hasAuthor ? 'Тестовый автор' : null,
+                    creationDate: new Date().toISOString(),
+                    software: 'Test Software 1.0',
+                    camera: hasGPS ? 'Test Camera' : null,
+                    fileSize: Math.floor(Math.random() * 10000000)
+                },
+                riskScore: riskScore,
+                warnings: hasGPS ? ['Обнаружены GPS-координаты'] : hasAuthor ? ['Обнаружен автор'] : []
+            };
+        }
+        
+        // ====================== ОЧИСТКА ФАЙЛОВ ======================
+        async function cleanFiles() {
+            if (uploadedFiles.length === 0) return;
+            
+            const mode = document.getElementById('modeSelect').value;
+            const autoSave = document.getElementById('autoSaveCheck').checked;
+            
+            showNotification(`Начинаем очистку (режим: ${getModeName(mode)})...`, 'info');
+            
+            // Обновляем статусы файлов
+            uploadedFiles.forEach(file => {
+                file.status = 'cleaning';
+            });
+            updateFileList();
+            
+            // Показываем кнопку сохранения
+            document.getElementById('saveAllBtn').classList.remove('hidden');
+            
+            // Очищаем каждый файл
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                
+                try {
+                    // В реальном приложении здесь будет вызов Electron IPC
+                    // const result = await window.api('clean-file', file.path, mode);
+                    const cleanResult = await withTimeout(
+                        window.api.cleanFile(file.path, mode),
+                        120000,
+                        `Таймаут очистки файла: ${file.name}`
+                    );
+                    console.log('Результат очистки:', cleanResult);
+                    
+                    // Пока используем имитацию
+                    // const result = await simulateFileCleaning(file, mode);
+                    
+                    if (cleanResult.success) {
+                        file.status = 'done';
+                        
+                        file.cleanResult = cleanResult;
+
+                        file.result = {
+                            cleaned: true,
+                            originalSize: file.size,
+                            cleanedSize: cleanResult.cleanedSize || cleanResult.size || 0,
+                            saved: false
+                        };
+                        
+                        showNotification(`Очищен: ${file.name}`, 'success');
+                        
+                        // Автосохранение
+                        if (autoSave) {
+                            await saveCleanedFile(i, false);
+                        }
+                    } else {
+                        console.log('Ошибка очистки:', cleanResult.error);
+                        file.status = 'error';
+                        file.result = { error: cleanResult.error };
+                        showNotification(`Ошибка очистки: ${file.name}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Исключение при очистке:', error);
+                    file.status = 'error';
+                    file.result = { error: error.message };
+                    showNotification(`Ошибка: ${file.name}`, 'error');
+                }
+                
+                updateFileList();
+                processedFiles++;
+                updateStats();
+            }
+            
+            // Показываем результаты очистки
+            showCleanResults(mode);
+            showNotification('Очистка завершена!', 'success');
+        }
+        
+        // Имитация очистки файла
+        async function simulateFileCleaning(file, mode) {
+            // Имитация задержки
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+            
+            const cleanedSize = Math.max(1000, file.size - Math.floor(Math.random() * file.size * 0.1));
+            
+            return {
+                success: true,
+                cleanedPath: file.path.replace(/(\.[^\.]+)$/, '_cleaned$1'),
+                size: cleanedSize
+            };
+        }
+        
+        // ====================== СОХРАНЕНИЕ ФАЙЛОВ ======================
+        async function saveCleanedFile(fileIndex, askPath = true) {
+            const file = uploadedFiles[fileIndex];
+            
+            if (!file.cleanResult) {
+                showNotification('Файл еще не был очищен', 'warning');
+                return;
+            }
+            
+            if (file.saved) {
+                showNotification('Файл уже сохранен', 'info');
+                return;
+            }
+            
+            try {
+                let savePath;
+                
+                if (askPath) {
+                    // Показываем диалог сохранения (в реальном приложении)
+                    // const result = await window.api('save-cleaned-file', file.cleanResult);
+                    const saveResult = await window.api.saveCleanedFile(file.cleanResult);
+                    
+                    // Пока имитируем
+                    //const result = await simulateSaveDialog(file);
+                    
+                    if (saveResult.success) {
+                        savePath = saveResult.savedPath;
+                        file.saved = true;
+                        file.savedPath = savePath;
+                        savedFiles++;
+                        
+                        showNotification(`Файл сохранен: ${getFileName(savePath)}`, 'success');
+                        
+                        // Открываем папку
+                        if (document.getElementById('openFolderCheck').checked) {
+                            await window.api.openFolder(getDirectory(savePath));
+                        }
+                    } else {
+                        showNotification('Сохранение отменено', 'warning');
+                        return;
+                    }
+                } else {
+                    // Автосохранение в ту же папку с суффиксом
+                    const saveResult = await window.api.saveCleanedFileAuto(file.cleanResult);
+                    if (!saveResult.success) {
+                        throw new Error(saveResult.error || 'Ошибка автосохранения');
+                    }
+                    savePath = saveResult.savedPath;
+                    file.saved = true;
+                    file.savedPath = savePath;
+                    savedFiles++;
+                    showNotification(`Файл автоматически сохранен: ${getFileName(savePath)}`, 'success');
+                }
+                
+                file.result.saved = true;
+                updateFileList();
+                updateStats();
+                
+            } catch (error) {
+                showNotification(`Ошибка сохранения: ${error.message}`, 'error');
+            }
+        }
+        
+        // Имитация диалога сохранения
+        async function simulateSaveDialog(file) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // В 80% случаев "сохраняем", в 20% - "отменяем"
+            if (Math.random() > 0.2) {
+                return {
+                    success: true,
+                    savedPath: file.path.replace(/(\.[^\.]+)$/, '_без_метаданных$1')
+                };
+            } else {
+                return {
+                    success: false,
+                    error: 'Сохранение отменено'
+                };
+            }
+        }
+        
+        // Сохранение всех файлов
+        async function saveAllCleanedFiles() {
+            if (uploadedFiles.length === 0) return;
+            
+            const saveMode = confirm('Как сохранить файлы?\n\nOK - каждый файл отдельно (выбрать путь для каждого)\nОтмена - заменить оригинальные файлы');
+            
+            let savedCount = 0;
+            
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                if (file.status === 'done' && file.cleanResult && !file.saved) {
+                    await saveCleanedFile(i, saveMode);
+                    savedCount++;
+                }
+            }
+            
+            if (savedCount > 0) {
+                showNotification(`Сохранено файлов: ${savedCount}`, 'success');
+            } else {
+                showNotification('Нет файлов для сохранения', 'info');
+            }
+        }
+        
+        // ====================== ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ ======================
+        function showAnalysisResults() {
+            const resultsElement = document.getElementById('results');
+            const avgRisk = uploadedFiles.length > 0 ? Math.round(totalRiskScore / uploadedFiles.length) : 0;
+            
+            let html = `
+                <div class="p-4 ${avgRisk > 70 ? 'risk-high' : avgRisk > 30 ? 'risk-medium' : 'risk-low'} rounded-lg mb-4">
+                    <h3 class="font-bold text-lg mb-2">📊 Результаты анализа</h3>
+                    <p>Проанализировано файлов: <strong>${uploadedFiles.length}</strong></p>
+                    <p>Средний риск утечки: <strong>${avgRisk}%</strong></p>
+                    <p class="text-sm mt-2">Рекомендуется очистить файлы с высоким риском</p>
+                </div>
+            `;
+            
+            uploadedFiles.forEach((file, index) => {
+                // Используй riskScore из результата анализа
+                const riskScore = file.analysisResult?.riskScore || file.riskScore || 0;
+                const riskColor = riskScore > 70 ? 'risk-high' : 
+                                  riskScore > 30 ? 'risk-medium' : 'risk-low';
+                
+                html += `
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center">
+                                <span class="text-2xl mr-2">${getFileIcon(file.name)}</span>
+                                <div>
+                                    <div class="font-medium truncate max-w-xs">${file.name}</div>
+                                    <div class="text-sm text-gray-600">
+                                        Риск: <span class="font-medium ${riskColor} px-2 py-1 rounded">${riskScore}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                ${file.metadata?.hasGPS ? '<span class="text-xs px-2 py-1 bg-red-100 text-red-800 rounded mr-2">GPS</span>' : ''}
+                                ${file.metadata?.author ? '<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Автор</span>' : ''}
+                            </div>
+                        </div>
+                        
+                        ${file.warnings?.length > 0 ? `
+                            <div class="mt-2">
+                                ${file.warnings.map(warning => `
+                                    <div class="text-sm text-red-600">
+                                        ⚠ ${warning}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            resultsElement.innerHTML = html;
+        }
+        
+        function showCleanResults(mode) {
+            const resultsElement = document.getElementById('results');
+            const modeName = getModeName(mode);
+            const successfulFiles = uploadedFiles.filter(f => f.status === 'done' && f.cleanResult).length;
+            
+            let html = `
+                <div class="p-4 ${successfulFiles === uploadedFiles.length ? 'bg-green-50' : 'bg-yellow-50'} rounded-lg mb-4">
+                    <h3 class="font-bold text-lg mb-2">
+                        ${successfulFiles === uploadedFiles.length ? '✅ Очистка завершена' : '⚠ Очистка завершена с ошибками'}
+                    </h3>
+                    <p>Режим: <strong>${modeName}</strong></p>
+                    <p>Успешно очищено: <strong>${successfulFiles} из ${uploadedFiles.length}</strong></p>
+                    
+                    <div class="mt-4 space-y-2">
+                        <button 
+                            onclick="saveAllCleanedFiles()"
+                            class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                            ${successfulFiles === 0 ? 'disabled' : ''}
+                        >
+                            💾 Сохранить все очищенные файлы (${successfulFiles})
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            uploadedFiles.forEach((file, index) => {
+                const fileIcon = getFileIcon(file.name);
+                
+                if (file.status === 'done' && file.cleanResult) {
+                    html += `
+                        <div class="p-3 bg-gray-50 rounded-lg mb-2">
+                            <div class="flex justify-between items-center mb-2">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-2">${fileIcon}</span>
+                                    <div>
+                                        <div class="font-medium truncate max-w-xs">${file.name}</div>
+                                        <div class="text-sm text-gray-600">
+                                            ${file.result ? `Размер: ${formatFileSize(file.result.originalSize || 0)} → ${formatFileSize(file.result.cleanedSize || 0)}` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    ${file.saved ? 
+                                        `<span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">✅ Сохранен</span>` : 
+                                        `<button 
+                                            onclick="saveCleanedFile(${index})"
+                                            class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
+                                        >
+                                            💾 Сохранить
+                                        </button>`
+                                    }
+                                </div>
+                            </div>
+                            
+                            ${file.savedPath ? `
+                                <div class="text-sm text-gray-600 mt-2">
+                                    <span class="text-green-600">✓</span> Сохранен как: <span class="font-medium">${getFileName(file.savedPath)}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                } else if (file.status === 'error') {
+                    html += `
+                        <div class="p-3 bg-red-50 rounded-lg mb-2">
+                            <div class="flex items-center">
+                                <span class="text-2xl mr-2">${fileIcon}</span>
+                                <div>
+                                    <div class="font-medium">${file.name}</div>
+                                    <div class="text-sm text-red-600">
+                                        ❌ Ошибка: ${file.result?.error || 'Неизвестная ошибка'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            resultsElement.innerHTML = html;
+        }
+        
+        // ====================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ======================
+        function getFileType(filename) {
+            const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+            if (['.jpg', '.jpeg', '.png', '.gif'].includes(ext)) return 'image';
+            if (ext === '.pdf') return 'pdf';
+            if (['.docx', '.doc'].includes(ext)) return 'document';
+            return 'unknown';
+        }
+        
+        function getFileIcon(filename) {
+            const type = getFileType(filename);
+            switch(type) {
+                case 'image': return '🖼️';
+                case 'pdf': return '📄';
+                case 'document': return '📝';
+                default: return '📁';
+            }
+        }
+        
+        function getModeName(mode) {
+            switch(mode) {
+                case 'social': return 'Для соц. сетей';
+                case 'business': return 'Для деловой переписки';
+                case 'anonymous': return 'Полная анонимность';
+                case 'custom': return 'Ручной режим';
+                default: return mode;
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Б';
+            const k = 1024;
+            const sizes = ['Б', 'КБ', 'МБ', 'ГБ'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        function getFileName(path) {
+            return path.split(/[\\/]/).pop();
+        }
+        
+        function getDirectory(path) {
+            const parts = path.split(/[\\/]/);
+            parts.pop();
+            return parts.join('/');
+        }
+        
+        function updateFileList() {
+            const fileListElement = document.getElementById('fileList');
+            
+            if (uploadedFiles.length === 0) {
+                fileListElement.innerHTML = `
+                    <div class="text-center text-gray-500 py-4">
+                        Файлы еще не загружены
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            uploadedFiles.forEach((file, index) => {
+                const icon = getFileIcon(file.name);
+                const statusColors = {
+                    waiting: 'bg-gray-100 text-gray-800',
+                    analyzing: 'bg-blue-100 text-blue-800',
+                    cleaning: 'bg-yellow-100 text-yellow-800',
+                    done: 'bg-green-100 text-green-800',
+                    error: 'bg-red-100 text-red-800'
+                };
+                
+                const statusTexts = {
+                    waiting: 'Ожидает',
+                    analyzing: 'Анализ',
+                    cleaning: 'Очистка',
+                    done: 'Готово',
+                    error: 'Ошибка'
+                };
+                
+                html += `
+                    <div class="file-item">
+                        <div class="flex items-center">
+                            <div class="text-2xl mr-3">${icon}</div>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium truncate">${file.name}</div>
+                                <div class="text-sm text-gray-500">
+                                    ${file.size ? formatFileSize(file.size) : ''}
+                                    ${file.riskScore ? ` • Риск: ${file.riskScore}%` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs px-2 py-1 rounded ${statusColors[file.status] || 'bg-gray-100'}">
+                                ${statusTexts[file.status] || file.status}
+                            </span>
+                            <button 
+                                onclick="removeFile(${index})"
+                                class="text-gray-400 hover:text-red-500 text-lg"
+                                title="Удалить"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            fileListElement.innerHTML = html;
+        }
+        
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            updateFileList();
+            updateButtons();
+            updateStats();
+        }
+        
+        function clearFiles() {
+            if (uploadedFiles.length > 0 && !confirm('Очистить список файлов?')) return;
+            
+            uploadedFiles = [];
+            updateFileList();
+            updateButtons();
+            updateStats();
+            
+            // Скрываем кнопку сохранения
+            document.getElementById('saveAllBtn').classList.add('hidden');
+            
+            // Очищаем результаты
+            document.getElementById('results').innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <div class="text-4xl mb-4">📊</div>
+                    <p>Результаты появятся здесь</p>
+                    <p class="text-sm mt-2">После анализа или очистки файлов</p>
+                </div>
+            `;
+            
+            showNotification('Список файлов очищен', 'info');
+        }
+        
+        function updateButtons() {
+            const hasFiles = uploadedFiles.length > 0;
+            document.getElementById('analyzeBtn').disabled = !hasFiles;
+            document.getElementById('cleanBtn').disabled = !hasFiles;
+        }
+        
+        function updateStats() {
+            document.getElementById('totalFiles').textContent = uploadedFiles.length;
+            document.getElementById('processedFiles').textContent = processedFiles;
+            document.getElementById('savedFiles').textContent = savedFiles;
+            
+            const avgRisk = uploadedFiles.length > 0 ? Math.round(totalRiskScore / uploadedFiles.length) : 0;
+            document.getElementById('riskScore').textContent = avgRisk + '%';
+        }
+        
+        function showUploadInfo() {
+            const uploadInfo = document.getElementById('uploadInfo');
+            const fileCount = document.getElementById('fileCount');
+            const progressFill = document.getElementById('progressFill');
+            
+            uploadInfo.classList.remove('hidden');
+            fileCount.textContent = `${uploadedFiles.length} файлов`;
+            progressFill.style.width = '100%';
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Удаляем старые уведомления
+            const oldNotifications = document.querySelectorAll('.notification');
+            oldNotifications.forEach(n => n.remove());
+            
+            const colors = {
+                success: 'bg-green-100 border border-green-300 text-green-800',
+                error: 'bg-red-100 border border-red-300 text-red-800',
+                warning: 'bg-yellow-100 border border-yellow-300 text-yellow-800',
+                info: 'bg-blue-100 border border-blue-300 text-blue-800'
+            };
+            
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${colors[type]}`;
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <span class="mr-2 text-lg">${icons[type]}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Автоудаление через 5 секунд
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transition = 'opacity 0.3s';
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, 5000);
+        }
+        
+        // ====================== ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ======================
+        async function generateReport() {
+            if (uploadedFiles.length === 0) {
+                showNotification('Нет данных для отчета', 'warning');
+                return;
+            }
+            
+            const report = `
+Отчет MetaGuard
+===============
+Дата: ${new Date().toLocaleString()}
+Всего файлов: ${uploadedFiles.length}
+Обработано: ${processedFiles}
+Сохранено: ${savedFiles}
+
+Детали файлов:
+${uploadedFiles.map((file, i) => `
+${i + 1}. ${file.name}
+    • Статус: ${file.status}
+    • Риск: ${file.riskScore || 0}%
+    • Очищен: ${file.cleanResult ? 'Да' : 'Нет'}
+    • Сохранен: ${file.saved ? 'Да' : 'Нет'}
+    ${file.savedPath ? `• Путь: ${file.savedPath}` : ''}
+`).join('\n')}
+            `;
+            
+            // В реальном приложении здесь будет вызов Electron IPC
+            // const result = await window.api('save-report', report, 'txt');
+            
+            // Пока просто показываем в консоли
+            console.log('Отчет:', report);
+            showNotification('Отчет сгенерирован (см. консоль)', 'info');
+            
+            // Предлагаем скачать
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `metaguard-report-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function showHelp() {
+            alert(`
+MetaGuard - приложение для удаления метаданных
+
+📖 КАК ИСПОЛЬЗОВАТЬ:
+
+1. ЗАГРУЗИТЕ ФАЙЛЫ
+   • Перетащите файлы в синюю зону
+   • Или нажмите "Выбрать файлы"
+   • Поддерживаются: JPG, PNG, PDF, DOCX
+
+2. АНАЛИЗИРУЙТЕ
+   • Нажмите "Анализировать метаданные"
+   • Увидите уровень риска для каждого файла
+   • Обнаружатся GPS-координаты, авторы и т.д.
+
+3. ОЧИСТИТЕ
+   • Выберите режим очистки
+   • Нажмите "Очистить метаданные"
+   • Файлы будут обработаны локально
+
+4. СОХРАНИТЕ
+   • Сохраните каждый файл отдельно
+   • Или нажмите "Сохранить все"
+   • Выберите место сохранения
+
+⚙️ НАСТРОЙКИ:
+   • Режимы очистки: от удаления GPS до полной анонимности
+   • Резервные копии: создаются автоматически
+   • Автосохранение: сохраняет сразу после очистки
+
+🔒 БЕЗОПАСНОСТЬ:
+   • Вся обработка происходит на вашем компьютере
+   • Данные никуда не отправляются
+   • Оригиналы файлов не изменяются
+            `);
+        }
+        
+        function showAbout() {
+            alert(`
+MetaGuard v1.0.0
+===============
+
+Приложение для защиты конфиденциальности
+путем удаления метаданных из файлов.
+
+✨ ФУНКЦИИ:
+• Удаление GPS-координат из фотографий
+• Очистка информации об авторе из документов
+• Удаление дат создания и программ
+• Локальная обработка данных
+• Подробные отчеты
+
+📁 ПОДДЕРЖИВАЕМЫЕ ФОРМАТЫ:
+• Изображения: JPG, PNG, GIF, WebP
+• Документы: PDF, DOCX, DOC
+
+🔧 ТЕХНОЛОГИИ:
+• Electron для нативного интерфейса
+• Локальная обработка файлов
+• Современный безопасный код
+
+📞 ПОДДЕРЖКА:
+• Все вопросы по использованию
+• Предложения по улучшению
+• Сообщения об ошибках
+
+© 2024 MetaGuard Project
+            `);
+        }
+        
+        function openDevTools() {
+            if (window.api?.openDevTools) {
+                window.api.openDevTools();
+            } else {
+                // В браузере открываем консоль
+                console.log('MetaGuard DevTools');
+                console.log('Файлы:', uploadedFiles);
+                console.log('Статистика:', {
+                    total: uploadedFiles.length,
+                    processed: processedFiles,
+                    saved: savedFiles,
+                    risk: totalRiskScore
+                });
+            }
+        }
+    </script>
+</body>
+</html>
