@@ -18,7 +18,7 @@
 ### Для разработчиков
 ```bash
 # Клонируйте репозиторий
-git clone https://github.com/annakor1/MetaGuard.git
+git clone https://github.com/annonym10/MetaGuard.git
 cd metaguard
 
 # Установите зависимости
